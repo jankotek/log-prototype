@@ -2,7 +2,7 @@
 
 Prototype  LSM key-value store.
 [Design specification](https://github.com/input-output-hk/iodb/blob/master/doc/design_spec.md)
-amd sp,e is derived from
+ is derived from
 [IODB project](https://github.com/input-output-hk/iodb).
 
 This project is not full database engine, but design prototype.
@@ -11,9 +11,9 @@ on append-only store.
 
 As prototype it has some limitations:
 
-- keys and values are primitive longs (easier to test compaction)
-- there is no close method, it relies on JVM garbage collector
-- store can not be reopened
+- keys and values are primitive 8-byte longs (easier to test compaction)
+- there is no close method, resource management relies on JVM garbage collector
+- store can not be reopened, data are lost after JVM exits
 
 If this prototype is successful (background compaction is stable),
 it will be integrated into MapDB4 in form of:

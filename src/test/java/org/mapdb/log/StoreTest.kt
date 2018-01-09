@@ -18,6 +18,18 @@ abstract class StoreTest: TestWithTempDir() {
         store.get(1) shouldBe 1L
     }
 
+    @Test fun getMulti(){
+        var store=create()
+
+        store.get(1) shouldBe Long.MIN_VALUE
+
+
+        for(i in 1L until 10000) {
+            store = store.update(mutableListOf(Pair(1L, i)))
+            store.get(1) shouldBe i
+        }
+    }
+
 }
 
 class LogStoreTest:StoreTest(){
@@ -30,4 +42,4 @@ class ShardedStoreTest:StoreTest(){
     override fun create(): Store = ShardedStore(dir=tempDir)
 
 }
-        */
+*/
