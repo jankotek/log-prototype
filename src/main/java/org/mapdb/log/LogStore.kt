@@ -1,58 +1,72 @@
 package org.mapdb.log
 
 import java.io.*
+import java.nio.*
+import java.nio.channels.FileChannel
+import java.nio.file.StandardOpenOption
 import java.util.concurrent.atomic.AtomicLong
 
 class LogStore(
         val dir: File,
-        val referencedFiles: List<File> = ArrayList<File>(),
+        val referencedFiles: Map<Long, ByteBuffer> = HashMap<Long,ByteBuffer>(),
         val curFile:Long=0
     ):Store{
 
     companion object {
+        //TODO static
         val fileCounter = AtomicLong(0)
+
     }
 
 
-    override fun update(keyvalues: List<Pair<Long,Long>>): Store {
+    override fun update(keyvalues: Iterable<Pair<Long,Long>>): Store {
         val newFileNum = fileCounter.incrementAndGet()
         val newFile = numToFile(newFileNum)
         newFile.deleteOnExit()
         assert(!newFile.exists())
 
-        val out1 = FileOutputStream(newFile)
-        val out2 = DataOutputStream(BufferedOutputStream(out1))
+        FileOutputStream(newFile).use { out1 ->
+            val out2 = DataOutputStream(BufferedOutputStream(out1))
 
 
-        //write prev file
-        out2.writeLong(curFile)
+            //write prev file
+            out2.writeLong(curFile)
 
-        //write number of key-values
-        out2.writeLong(keyvalues.size.toLong())
+            //write number of key-values
+            //TODO do not count, use single iteration
+            out2.writeLong(keyvalues.count().toLong())
 
-        //assert sorted
-        keyvalues.fold(Pair(Long.MIN_VALUE, Long.MIN_VALUE)) { prev: Pair<Long, Long>, cur: Pair<Long, Long> ->
-            assert(prev.first< cur.first)
-            cur
+            //TODO single pass, use temp files
+            //assert sorted
+            keyvalues.fold(Pair(Long.MIN_VALUE, Long.MIN_VALUE)) { prev: Pair<Long, Long>, cur: Pair<Long, Long> ->
+                assert(prev.first < cur.first)
+                cur
+            }
+
+            //write keys
+            for ((key, value) in keyvalues) {
+                out2.writeLong(key)
+            }
+
+            //write vals
+            for ((key, value) in keyvalues) {
+                out2.writeLong(value)
+            }
+
+
+            //flush
+            out2.flush()
+
         }
 
-        //write key-vals
-        for((key,value) in keyvalues){
-            out2.writeLong(key)
-            //TODO write files into separate region
-            out2.writeLong(value)
+        //mmap
+        val mmap = FileChannel.open(newFile.toPath(), StandardOpenOption.READ).use{
+            it.map(FileChannel.MapMode.READ_ONLY, 0, newFile.length())
         }
-
-
-        //flush
-        out2.flush()
         // TODO file sync? out1.fd.sync()
-        out1.close()
-
-        val refFiles2 = referencedFiles+newFile
-
+        val refFiles2 = HashMap(referencedFiles)
+        refFiles2.put(newFileNum, mmap)
         return LogStore(dir=dir, referencedFiles = refFiles2, curFile =newFileNum)
-
     }
 
     private fun numToFile(fileNum: Long) = File(dir.path + "/log" + fileNum)
@@ -62,28 +76,23 @@ class LogStore(
         var fileNum = curFile
 
         while(fileNum!=0L){
-            val file = numToFile(fileNum)
-            assert(file.exists())
-            val in1 = FileInputStream(file)
-            val in2 = DataInputStream(BufferedInputStream(in1))
+            assert(numToFile(fileNum).exists())
 
-            //read prev file number
-            fileNum = in2.readLong()
+            val mmap = referencedFiles[fileNum]!!
+            //read prev file
+            fileNum = mmap.getLong(0)
+            val count = mmap.getLong(8).toInt()
+            val size = count*16+16
 
-            val keyValCount = in2.readLong()
-
-            //TODO binary search
-            for(i in 0 until keyValCount){
-                val key2 = in2.readLong()
-                val value = in2.readLong()
-
-                if(key2==key)
-                    return value
-            }
+            //run binary search
+            val keyOffset = Util.binarySearch(mmap, key, size)
+            if(keyOffset>0)
+                return mmap.getLong(keyOffset+count*8)
         }
         //not found
         return Long.MIN_VALUE
 
     }
+
 
 }

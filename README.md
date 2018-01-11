@@ -9,7 +9,7 @@ This project is not full database engine, but design prototype.
 It explores branching snapshots, background compaction and disk space allocation
 on append-only store.
 
-As prototype it has some limitations:
+As a prototype it has some limitations:
 
 - keys and values are primitive 8-byte longs (easier to test compaction)
 - there is no close method, resource management relies on JVM garbage collector

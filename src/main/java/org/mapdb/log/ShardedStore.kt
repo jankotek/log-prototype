@@ -4,7 +4,7 @@ import java.io.File
 
 class ShardedStore(val dir: File):Store{
 
-    override fun update(keyvalues: MutableList<Pair<Long, Long>>?): Store {
+    override fun update(keyvalues: Iterable<Pair<Long, Long>>?): Store {
        return this
     }
 
