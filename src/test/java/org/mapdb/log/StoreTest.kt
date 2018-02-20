@@ -3,6 +3,7 @@ package org.mapdb.log
 import org.junit.Test
 import org.mapdb.TestWithTempDir
 import io.kotlintest.matchers.*
+import java.util.*
 
 abstract class StoreTest: TestWithTempDir() {
 
@@ -68,6 +69,97 @@ abstract class StoreTest: TestWithTempDir() {
             }
         }
     }
+
+    @Test fun all_removed(){
+        var store=create()
+
+        val rounds = 100
+        val max = 100
+        var r = Random(0)
+
+        for(round in 0 until rounds){
+            val keyVals = (0 until max).map { Pair(r.nextLong(), r.nextLong()) }.toList().sortedBy { it.first }
+            store = store.update(keyVals)
+        }
+
+        //check content
+        r = Random(0)
+        for(round in 0 until rounds){
+            for (i in (0 until max)){
+                val key = r.nextLong()
+                val value = r.nextLong()
+                store.get(key) shouldBe value
+            }
+        }
+
+        //delete
+        r = Random(0)
+        for(round in 0 until rounds){
+            val keyVals = (0 until max).map { Pair(r.nextLong(), r.nextLong()) }.toList().sortedBy { it.first }
+            store = store.update(keyVals.map {Pair(it.first, Long.MIN_VALUE) })
+        }
+
+        //check deleted
+
+        //check content
+        r = Random(0)
+        for(round in 0 until rounds){
+            for (i in (0 until max)){
+                val key = r.nextLong()
+                val value = r.nextLong()
+                store.get(key) shouldBe Long.MIN_VALUE
+            }
+        }
+    }
+
+    @Test fun old_snapshots(){
+        var store=create()
+
+        val rounds = 10
+        val max = 10
+        var r = Random(0)
+
+        data class Snapshot(val round:Int, val removed:Boolean, val store:Store)
+
+        val snapshots = ArrayList<Snapshot>()
+
+        fun checkSnapshots(){
+            for(s in snapshots){
+                val r = Random(0)
+                for(round in 0 until rounds){
+                    val exists =
+                            if(s.removed) round>s.round // was not yet deleted, if round is higher
+                            else round<=s.round // was not yet inserted
+
+                    for(i in 0 until max){
+                        val key = r.nextLong()
+                        val value = r.nextLong()
+
+                        s.store.get(key) shouldBe
+                                if(exists) value else Long.MIN_VALUE
+                    }
+
+                }
+            }
+        }
+
+        for(round in 0 until rounds){
+            val keyVals = (0 until max).map { Pair(r.nextLong(), r.nextLong()) }.toList().sortedBy { it.first }
+            store = store.update(keyVals)
+            snapshots+=Snapshot(round=round, removed=false, store=store)
+            checkSnapshots()
+        }
+
+        //delete
+        r = Random(0)
+        for(round in 0 until rounds){
+            val keyVals = (0 until max).map { Pair(r.nextLong(), r.nextLong()) }.toList().sortedBy { it.first }
+            store = store.update(keyVals.map {Pair(it.first, Long.MIN_VALUE) })
+            snapshots+=Snapshot(round=round, removed=true, store=store)
+            checkSnapshots()
+        }
+    }
+
 
 }
 

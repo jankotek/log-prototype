@@ -28,7 +28,6 @@ class LogStore(
         FileOutputStream(newFile).use { out1 ->
             val out2 = DataOutputStream(BufferedOutputStream(out1))
 
-
             //write prev file
             out2.writeLong(curFile)
 
