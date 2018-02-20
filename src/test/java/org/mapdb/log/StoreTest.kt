@@ -1,7 +1,6 @@
 package org.mapdb.log
 
 import org.junit.Test
-import org.mapdb.TestWithTempDir
 import io.kotlintest.matchers.*
 import java.util.*
 
@@ -165,7 +164,6 @@ abstract class StoreTest: TestWithTempDir() {
 
 class LogStoreTest:StoreTest(){
     override fun create(): Store = LogStore(dir=tempDir)
-
 }
 
 /*
